@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Smart Analytics · Dynamic AI Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem('dashboard-theme');
+        if (saved === 'dark' || saved === 'light') document.documentElement.dataset.theme = saved;
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    /* Dashboard-only styles. The shared style.css and chatbot UI are not modified. */
+    :root {
+      --dash-bg: #f4f2ff; --dash-surface: #fff; --dash-surface-soft: #faf9ff;
+      --dash-border: #e7e2f8; --dash-text: #20163e; --dash-muted: #756b91;
+      --dash-purple: #7652e8; --dash-purple-2: #a78bfa; --dash-purple-soft: #eee8ff;
+      --dash-shadow: 0 12px 34px rgba(64, 42, 125, .08);
+    }
+    html[data-theme="dark"] {
+      --dash-bg: #100d1c; --dash-surface: #1b162b; --dash-surface-soft: #241d38;
+      --dash-border: #39304f; --dash-text: #f1ecff; --dash-muted: #b0a5ca;
+      --dash-purple: #b39aff; --dash-purple-2: #8b5cf6; --dash-purple-soft: #352653;
+      --dash-shadow: 0 14px 38px rgba(0,0,0,.24);
+    }
+    body { background: var(--dash-bg) !important; color: var(--dash-text); }
+    .dash-shell { min-height: calc(100vh - 64px); }
+    .dash-topbar { background: var(--dash-surface) !important; border-color: var(--dash-border) !important; }
+    .dash-brand-mark { background: linear-gradient(135deg,#6d4aff,#a855f7) !important; box-shadow: 0 5px 14px #7652e833; }
+    .dash-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:22px; max-width:1540px; margin:0 auto; padding:24px; }
+    .dash-sidebar { align-self:start; position:sticky; top:86px; padding:16px 12px; border:1px solid var(--dash-border); border-radius:20px; background:var(--dash-surface); box-shadow:var(--dash-shadow); }
+    .side-caption { padding:5px 10px 12px; color:var(--dash-muted); font-size:.68rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .side-nav { display:grid; gap:5px; }
+    .side-nav a { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:12px; color:var(--dash-muted); font-size:.88rem; font-weight:650; transition:background .18s,color .18s,transform .18s; }
+    .side-nav a:hover { background:var(--dash-purple-soft); color:var(--dash-purple); transform:translateX(2px); }
+    .side-nav a.active { background:linear-gradient(100deg,var(--dash-purple-soft),transparent); color:var(--dash-purple); }
+    .side-icon { width:24px; text-align:center; font-size:1.05rem; }
+    .side-note { margin:20px 5px 4px; padding:12px; border-radius:14px; background:linear-gradient(140deg,var(--dash-purple-soft),var(--dash-surface-soft)); color:var(--dash-muted); font-size:.76rem; line-height:1.5; }
+    .side-note strong { display:block; color:var(--dash-text); margin-bottom:4px; }
+    .dash-main { min-width:0; }
+    .dash-hero { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px; margin:0 0 18px; }
+    .dash-eyebrow { display:inline-flex; align-items:center; gap:7px; color:var(--dash-purple); font-size:.72rem; font-weight:850; letter-spacing:.13em; text-transform:uppercase; margin-bottom:8px; }
+    .dash-eyebrow:before { content:""; width:18px; height:2px; background:var(--dash-purple); border-radius:5px; }
+    .dash-hero h1 { margin:0 0 5px; color:var(--dash-text); font-size:clamp(1.7rem,3vw,2.25rem); letter-spacing:-.04em; }
+    .dash-hero p { margin:0; color:var(--dash-muted); font-size:.94rem; }
+    .dash-actions { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .dash-updated { color:var(--dash-muted); font-size:.76rem; padding:8px 11px; border:1px solid var(--dash-border); border-radius:999px; background:var(--dash-surface); }
+    .dash-btn { border:1px solid var(--dash-border); background:var(--dash-surface); color:var(--dash-text); border-radius:11px; padding:9px 12px; cursor:pointer; font-size:.82rem; font-weight:700; transition:.18s; }
+    .dash-btn:hover { border-color:var(--dash-purple); color:var(--dash-purple); transform:translateY(-1px); }
+    .dash-btn.primary { background:linear-gradient(135deg,#7048e8,#a855f7); color:white; border-color:transparent; }
+    .dash-btn.primary:hover { color:white; filter:brightness(1.05); }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 14px; margin-bottom:14px; border:1px solid var(--dash-border); border-radius:16px; background:var(--dash-surface); box-shadow:var(--dash-shadow); }
+    .toolbar-label { color:var(--dash-muted); font-size:.8rem; font-weight:750; }
+    .toolbar-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+    .dash-select,.dash-search { min-height:37px; padding:8px 11px; border:1px solid var(--dash-border); border-radius:10px; background:var(--dash-surface-soft); color:var(--dash-text); outline:none; font:inherit; font-size:.82rem; }
+    .dash-select:focus,.dash-search:focus { border-color:var(--dash-purple); box-shadow:0 0 0 3px color-mix(in srgb,var(--dash-purple) 17%,transparent); }
+    .insight-box { display:flex; gap:12px; align-items:flex-start; padding:15px 17px; margin-bottom:16px; border:1px solid #d8ccff; border-radius:16px; background:linear-gradient(120deg,#eee8ff,#fbf8ff); color:#382568; font-size:.88rem; line-height:1.55; box-shadow:0 6px 20px #7652e80b; }
+    html[data-theme="dark"] .insight-box { background:linear-gradient(120deg,#2b2045,#211a33); border-color:#4a386b; color:#e6dcff; }
+    .insight-icon { flex:0 0 34px; width:34px; height:34px; display:grid; place-items:center; border-radius:11px; background:#fff; color:#7652e8; font-size:1.1rem; }
+    html[data-theme="dark"] .insight-icon { background:#392954; color:#d4c4ff; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; margin-bottom:16px; }
+    .kpi { position:relative; overflow:hidden; padding:16px; min-width:0; border:1px solid var(--dash-border); border-radius:17px; background:var(--dash-surface); box-shadow:var(--dash-shadow); transition:transform .2s,border-color .2s,box-shadow .2s; }
+    .kpi:hover { transform:translateY(-3px); border-color:#c7b5ff; box-shadow:0 16px 35px #5532a615; }
+    .kpi:after { content:""; position:absolute; width:96px; height:96px; right:-39px; top:-44px; border-radius:50%; background:var(--dash-purple-soft); opacity:.75; }
+    .kpi-top { display:flex; align-items:center; justify-content:space-between; gap:8px; position:relative; z-index:1; }
+    .kpi-label { color:var(--dash-muted); font-size:.68rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+    .kpi-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:var(--dash-purple-soft); color:var(--dash-purple); font-size:1rem; }
+    .kpi-value { position:relative; z-index:1; color:var(--dash-text); font-size:1.85rem; font-weight:850; letter-spacing:-.045em; margin:8px 0 2px; }
+    .kpi-sub { position:relative; z-index:1; color:var(--dash-muted); font-size:.75rem; }
+    .mini-chart { display:flex; align-items:flex-end; gap:3px; height:22px; margin-top:9px; }
+    .mini-chart span { flex:1; min-width:2px; border-radius:4px 4px 2px 2px; background:linear-gradient(180deg,#b39aff,#7652e8); opacity:.85; }
+    .dash-grid { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:15px; margin-bottom:15px; }
+    .panel { min-width:0; padding:18px; border:1px solid var(--dash-border); border-radius:19px; background:var(--dash-surface); box-shadow:var(--dash-shadow); }
+    .panel-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:15px; }
+    .panel-title { margin:0; color:var(--dash-text); font-size:.98rem; font-weight:800; letter-spacing:-.015em; }
+    .panel-subtitle { margin:4px 0 0; color:var(--dash-muted); font-size:.75rem; }
+    .panel-badge { display:inline-flex; align-items:center; white-space:nowrap; padding:5px 8px; border-radius:999px; color:var(--dash-purple); background:var(--dash-purple-soft); font-size:.68rem; font-weight:800; }
+    .activity-chart { display:flex; align-items:stretch; gap:7px; min-height:170px; padding-top:8px; overflow-x:auto; }
+    .chart-col { flex:1; min-width:32px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:6px; min-height:155px; }
+    .chart-col .val { color:var(--dash-text); font-size:.68rem; font-weight:800; }
+    .chart-col .stem-wrap { height:112px; width:100%; display:flex; align-items:flex-end; justify-content:center; }
+    .chart-col .stem { width:min(24px,75%); min-height:4px; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg,#b29aff,#7652e8); box-shadow:0 4px 12px #7652e825; transition:height .35s ease; }
+    .chart-col .lbl { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dash-muted); font-size:.64rem; }
+    .chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; color:var(--dash-muted); font-size:.72rem; }
+    .legend-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+    .sentiment-layout { display:flex; align-items:center; justify-content:center; gap:24px; min-height:170px; flex-wrap:wrap; }
+    .donut { width:146px; height:146px; border-radius:50%; display:grid; place-items:center; position:relative; flex:0 0 auto; background:conic-gradient(#10b981 0 25%,#f59e0b 25% 75%,#fb7185 75% 100%); }
+    .donut:before { content:""; width:94px; height:94px; border-radius:50%; background:var(--dash-surface); position:absolute; }
+    .donut-center { z-index:1; text-align:center; }
+    .donut-center strong { display:block; color:var(--dash-text); font-size:1.35rem; }
+    .donut-center span { color:var(--dash-muted); font-size:.68rem; }
+    .sentiment-legend { display:grid; gap:12px; min-width:130px; }
+    .sentiment-item { display:grid; grid-template-columns:10px 1fr auto; gap:8px; align-items:center; color:var(--dash-muted); font-size:.8rem; }
+    .sentiment-item strong { color:var(--dash-text); }
+    .bar-list { display:grid; gap:12px; }
+    .bar-row { display:grid; grid-template-columns:minmax(72px,125px) minmax(40px,1fr) 30px; gap:10px; align-items:center; font-size:.78rem; }
+    .bar-label { color:var(--dash-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bar-track { height:9px; background:var(--dash-surface-soft); border:1px solid var(--dash-border); border-radius:999px; overflow:hidden; }
+    .bar-fill { height:100%; min-width:2px; border-radius:999px; background:linear-gradient(90deg,#7652e8,#ad79ff); }
+    .bar-count { text-align:right; color:var(--dash-text); font-weight:800; font-variant-numeric:tabular-nums; }
+    .feedback-overview { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:13px; }
+    .feedback-stat { padding:12px; border-radius:13px; background:var(--dash-surface-soft); border:1px solid var(--dash-border); }
+    .feedback-stat strong { display:block; font-size:1.2rem; color:var(--dash-text); }
+    .feedback-stat span { color:var(--dash-muted); font-size:.75rem; }
+    .feedback-progress { height:9px; overflow:hidden; border-radius:999px; background:var(--dash-surface-soft); border:1px solid var(--dash-border); display:flex; }
+    .feedback-progress .up { background:#10b981; } .feedback-progress .down { background:#fb7185; }
+    .source-note { margin-top:10px; color:var(--dash-muted); font-size:.73rem; line-height:1.45; }
+    .table-panel { margin-top:0; }
+    .table-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .table-wrap { overflow:auto; }
+    .table-list { width:100%; border-collapse:collapse; font-size:.82rem; min-width:650px; }
+    .table-list th { text-align:left; padding:11px 9px; color:var(--dash-muted); background:var(--dash-surface-soft); border-bottom:1px solid var(--dash-border); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+    .table-list th button { padding:0; border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; font-weight:inherit; letter-spacing:inherit; text-transform:inherit; }
+    .table-list td { padding:12px 9px; color:var(--dash-text); border-bottom:1px solid var(--dash-border); vertical-align:middle; }
+    .table-list tr:last-child td { border-bottom:0; }
+    .conversation-title { max-width:310px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; }
+    .conversation-meta { display:block; margin-top:3px; color:var(--dash-muted); font-size:.7rem; font-weight:400; }
+    .pill { display:inline-block; max-width:125px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; padding:4px 8px; border-radius:999px; background:var(--dash-purple-soft); color:var(--dash-purple); font-size:.68rem; font-weight:800; }
+    .open-btn { padding:7px 10px; border:1px solid var(--dash-border); border-radius:9px; background:var(--dash-surface); color:var(--dash-purple); cursor:pointer; font-size:.75rem; font-weight:800; white-space:nowrap; }
+    .open-btn:hover { background:var(--dash-purple-soft); }
+    .empty-note { color:var(--dash-muted); font-size:.85rem; margin:0; padding:10px 0; }
+    .status-message { margin-top:10px; color:var(--dash-muted); font-size:.78rem; min-height:1.1em; }
+    .dash-footer { padding:17px 2px 5px; color:var(--dash-muted); font-size:.72rem; text-align:center; }
+    .mobile-nav-toggle { display:none; }
+    @keyframes riseIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .kpi,.panel,.insight-box { animation:riseIn .35s ease both; }
+    .kpi:nth-child(2) { animation-delay:.03s; } .kpi:nth-child(3) { animation-delay:.06s; } .kpi:nth-child(4) { animation-delay:.09s; }
+    @media (max-width:1100px) { .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .dash-layout { grid-template-columns:190px minmax(0,1fr); padding:18px; gap:15px; } }
+    @media (max-width:800px) {
+      .dash-layout { display:block; padding:14px; }
+      .dash-sidebar { position:static; display:none; margin-bottom:14px; }
+      .dash-sidebar.open { display:block; }
+      .mobile-nav-toggle { display:inline-flex; }
+      .dash-grid { grid-template-columns:1fr; }
+      .dash-hero { align-items:flex-start; }
+      .dash-actions { width:100%; }
+      .dash-updated { flex:1; }
+      .side-nav { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .side-note { display:none; }
+    }
+    @media (max-width:480px) {
+      .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+      .kpi { padding:12px; } .kpi-value { font-size:1.5rem; }
+      .kpi-label { font-size:.61rem; } .kpi-icon { width:29px; height:29px; }
+      .panel { padding:14px; } .toolbar { align-items:flex-start; }
+      .toolbar-controls { width:100%; } .dash-select { flex:1; }
+      .bar-row { grid-template-columns:84px minmax(30px,1fr) 24px; gap:7px; }
+      .sentiment-layout { gap:14px; }
+    }
+    @media (prefers-reduced-motion:reduce) { *,*:before,*:after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+  </style>
+</head>
+<body>
+  <header class="topbar dash-topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark dash-brand-mark">✦</span>
+      <span class="brand-copy"><strong>Dynamic AI Chatbot</strong><small>Smart analytics workspace</small></span>
+    </a>
+    <div class="top-actions">
+      <button class="dash-btn mobile-nav-toggle" id="mobileNavToggle" type="button" aria-expanded="false">☰ Menu</button>
+      <button class="dash-btn" id="themeToggle" type="button" aria-label="Toggle dashboard theme">☾ Dark mode</button>
+      <a class="dashboard-link" href="/">← Back to chat</a>
+    </div>
+  </header>
+
+  <div class="dash-shell">
+    <div class="dash-layout">
+      <aside class="dash-sidebar" id="dashSidebar">
+        <div class="side-caption">Workspace</div>
+        <nav class="side-nav" aria-label="Dashboard navigation">
+          <a class="active" href="#overview"><span class="side-icon">▦</span> Overview</a>
+          <a href="#activity"><span class="side-icon">⌁</span> Activity</a>
+          <a href="#ai-insights"><span class="side-icon">✧</span> AI insights</a>
+          <a href="#feedback-panel"><span class="side-icon">♡</span> Feedback</a>
+          <a href="#conversations"><span class="side-icon">☷</span> Conversations</a>
+          <a href="/"><span class="side-icon">↗</span> Open chatbot</a>
+        </nav>
+        <div class="side-note"><strong>✦ Analytics tip</strong>The activity range filters the daily chart only. Aggregate cards and AI breakdowns summarize all available records.</div>
+      </aside>
+
+      <main class="dash-main" id="overview">
+        <section class="dash-hero">
+          <div>
+            <div class="dash-eyebrow">AI workspace / analytics</div>
+            <h1>Smart Analytics</h1>
+            <p>Understand usage, sentiment, intent, feedback and response sources.</p>
+          </div>
+          <div class="dash-actions">
+            <span class="dash-updated" id="updatedAt">Updating…</span>
+            <button class="dash-btn" id="refreshBtn" type="button">↻ Refresh</button>
+            <button class="dash-btn primary" id="exportBtn" type="button">↓ Export CSV</button>
+          </div>
+        </section>
+
+        <div class="toolbar">
+          <span class="toolbar-label">Dashboard controls</span>
+          <div class="toolbar-controls">
+            <label class="toolbar-label" for="activityRange">Activity range</label>
+            <select class="dash-select" id="activityRange">
+              <option value="7">Last 7 days</option>
+              <option value="14" selected>Last 14 days</option>
+              <option value="all">All available activity</option>
+            </select>
+            <span class="toolbar-label">Activity chart only · Auto-refresh: 60 sec</span>
+          </div>
+        </div>
+
+        <div class="insight-box" id="insightBox" role="status">
+          <span class="insight-icon">✧</span><div>Loading your analytics summary…</div>
+        </div>
+
+        <section class="kpi-grid" aria-label="Key metrics">
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Total messages</span><span class="kpi-icon">▤</span></div><div class="kpi-value" id="kMessages">—</div><div class="kpi-sub">All roles · all time</div><div class="mini-chart" id="miniMessages" aria-hidden="true"></div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Conversations</span><span class="kpi-icon">☷</span></div><div class="kpi-value" id="kConvos">—</div><div class="kpi-sub" id="kMsgPerConvo">—</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">User messages</span><span class="kpi-icon">↗</span></div><div class="kpi-value" id="kUser">—</div><div class="kpi-sub">Incoming messages</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Assistant replies</span><span class="kpi-icon">✧</span></div><div class="kpi-value" id="kAssistant">—</div><div class="kpi-sub">Outgoing messages</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Avg. message length</span><span class="kpi-icon">Aa</span></div><div class="kpi-value" id="kAvgLen">—</div><div class="kpi-sub">Characters per user message</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Satisfaction</span><span class="kpi-icon">♡</span></div><div class="kpi-value" id="kSat">—</div><div class="kpi-sub" id="kFeedback">Feedback ratings</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Registered users</span><span class="kpi-icon">♙</span></div><div class="kpi-value" id="kUsers">—</div><div class="kpi-sub">Accounts created</div></article>
+          <article class="kpi"><div class="kpi-top"><span class="kpi-label">Saved memories</span><span class="kpi-icon">◈</span></div><div class="kpi-value" id="kMemories">—</div><div class="kpi-sub">Stored long-term facts</div></article>
+        </section>
+
+        <section class="dash-grid" id="activity">
+          <article class="panel">
+            <div class="panel-head"><div><h2 class="panel-title">Message activity</h2><p class="panel-subtitle">Messages by day in the selected range</p></div><span class="panel-badge" id="peakBadge">Peak —</span></div>
+            <div class="activity-chart" id="dailyChart"><p class="empty-note">Loading activity…</p></div>
+            <div class="chart-legend"><span><i class="legend-dot" style="background:#8b5cf6"></i>Daily message count</span><span id="activityRangeNote">Last 14 days available</span></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><h2 class="panel-title">Sentiment distribution</h2><p class="panel-subtitle">Classification of user messages</p></div><span class="panel-badge">AI signal</span></div>
+            <div class="sentiment-layout">
+              <div class="donut" id="sentimentDonut" role="img" aria-label="Sentiment distribution chart"><div class="donut-center"><strong id="sentimentTotal">0</strong><span>classified</span></div></div>
+              <div class="sentiment-legend" id="sentimentLegend"></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="dash-grid" id="ai-insights">
+          <article class="panel">
+            <div class="panel-head"><div><h2 class="panel-title">Top user intents</h2><p class="panel-subtitle">What users most often ask for</p></div><span class="panel-badge">Top 12</span></div>
+            <div class="bar-list" id="intentBars"><p class="empty-note">Loading intents…</p></div>
+          </article>
+          <article class="panel" id="feedback-panel">
+            <div class="panel-head"><div><h2 class="panel-title">Response feedback</h2><p class="panel-subtitle">User ratings for assistant replies</p></div><span class="panel-badge">Quality signal</span></div>
+            <div class="feedback-overview">
+              <div class="feedback-stat"><strong id="feedbackUp">0</strong><span>Helpful replies</span></div>
+              <div class="feedback-stat"><strong id="feedbackDown">0</strong><span>Not helpful</span></div>
+            </div>
+            <div class="feedback-progress" aria-label="Feedback rating distribution"><div class="up" id="feedbackUpBar" style="width:0%"></div><div class="down" id="feedbackDownBar" style="width:0%"></div></div>
+            <p class="source-note" id="feedbackNote">Feedback insights will appear here when ratings are available.</p>
+          </article>
+        </section>
+
+        <section class="dash-grid">
+          <article class="panel">
+            <div class="panel-head"><div><h2 class="panel-title">Reply sources</h2><p class="panel-subtitle">Recorded source labels for assistant responses</p></div><span class="panel-badge">Sources</span></div>
+            <div class="bar-list" id="sourceBars"><p class="empty-note">Loading sources…</p></div>
+            <p class="source-note">Counts reflect stored source labels. They do not independently measure answer accuracy.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><h2 class="panel-title">Analytics snapshot</h2><p class="panel-subtitle">Quick operational indicators</p></div><span class="panel-badge">Overview</span></div>
+            <div class="bar-list" id="snapshotBars"></div>
+            <p class="source-note">Metrics are calculated from data returned by the existing analytics endpoint.</p>
+          </article>
+        </section>
+
+        <section class="panel table-panel" id="conversations">
+          <div class="panel-head">
+            <div><h2 class="panel-title">Recent conversations</h2><p class="panel-subtitle">Search, sort and reopen a previous chat</p></div>
+            <div class="table-tools">
+              <input class="dash-search" type="search" id="conversationSearch" placeholder="Search title or ID…" aria-label="Search conversations">
+              <select class="dash-select" id="conversationSort" aria-label="Sort conversations"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-list">
+              <thead><tr><th><button type="button" id="sortTitle">Conversation ↕</button></th><th><button type="button" id="sortUpdated">Last updated ↕</button></th><th>ID</th><th>Action</th></tr></thead>
+              <tbody id="recentBody"><tr><td colspan="4" class="empty-note">Loading conversations…</td></tr></tbody>
+            </table>
+          </div>
+          <div class="status-message" id="conversationStatus" aria-live="polite"></div>
+        </section>
+        <footer class="dash-footer">Dynamic AI Chatbot · Analytics dashboard · Private local application data</footer>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let analyticsData = null;
+    let conversationRows = [];
+    let titleSortDirection = 1;
+    let updatedSortDirection = -1;
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function animateNumber(el, target) {
+      const end = Number(target) || 0;
+      const start = 0;
+      const duration = 520;
+      const started = performance.now();
+      function frame(now) {
+        const p = Math.min(1, (now - started) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(start + (end - start) * eased).toLocaleString();
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+    function drawMini(id, values) {
+      const node = $(id);
+      const nums = (values || []).slice(-10).map(v => Number(v.count) || 0);
+      if (!nums.length) { node.innerHTML = ''; return; }
+      const max = Math.max(1, ...nums);
+      node.innerHTML = nums.map(v => `<span style="height:${Math.max(12, v/max*100)}%"></span>`).join('');
+    }
+    function renderBars(containerId, items, labelKey, maxItems = 12) {
+      const list = (items || []).slice(0, maxItems);
+      if (!list.length) { $(containerId).innerHTML = '<p class="empty-note">No data available yet.</p>'; return; }
+      const max = Math.max(1, ...list.map(item => Number(item.count) || 0));
+      $(containerId).innerHTML = list.map(item => {
+        const label = String(item[labelKey] ?? 'Unknown');
+        const count = Number(item.count) || 0;
+        const pct = Math.max(count > 0 ? 2 : 0, Math.round(count / max * 100));
+        return `<div class="bar-row" title="${escapeHtml(label)}: ${count}"><span class="bar-label">${escapeHtml(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-count">${count.toLocaleString()}</span></div>`;
+      }).join('');
+    }
+    function renderSentiment(sentiments) {
+      const colors = { positive:'#10b981', neutral:'#f59e0b', negative:'#fb7185' };
+      const entries = Object.entries(sentiments || {}).map(([name,count]) => [name, Number(count)||0]);
+      const total = entries.reduce((sum, row) => sum + row[1], 0);
+      $('sentimentTotal').textContent = total.toLocaleString();
+      if (!total) {
+        $('sentimentDonut').style.background = 'conic-gradient(var(--dash-border) 0 100%)';
+        $('sentimentLegend').innerHTML = '<p class="empty-note">No sentiment data yet.</p>';
+        return;
+      }
+      let current = 0;
+      const segments = entries.map(([name,count]) => {
+        const start = current; current += count / total * 100;
+        const color = colors[name.toLowerCase()] || '#a78bfa';
+        return `${color} ${start}% ${current}%`;
+      });
+      $('sentimentDonut').style.background = `conic-gradient(${segments.join(',')})`;
+      $('sentimentLegend').innerHTML = entries.map(([name,count]) => {
+        const color = colors[name.toLowerCase()] || '#a78bfa';
+        const pct = Math.round(count / total * 100);
+        return `<div class="sentiment-item"><span class="legend-dot" style="background:${color};margin:0"></span><span>${escapeHtml(name)}</span><strong>${count} <small style="color:var(--dash-muted);font-weight:600">${pct}%</small></strong></div>`;
+      }).join('');
+    }
+    function renderActivity(data) {
+      const daily = data.daily_activity || [];
+      const range = $('activityRange').value;
+      const visible = range === 'all' ? daily : daily.slice(-Number(range));
+      const peak = visible.length ? visible.reduce((best, day) => day.count > best.count ? day : best, visible[0]) : null;
+      $('peakBadge').textContent = peak ? `Peak ${peak.day}` : 'No activity';
+      $('activityRangeNote').textContent = range === 'all' ? `${visible.length} available days (API provides up to 14)` : `Showing ${visible.length} of ${range} available days`;
+      if (!visible.length) { $('dailyChart').innerHTML = '<p class="empty-note">No activity in this range.</p>'; return; }
+      const max = Math.max(1, ...visible.map(day => Number(day.count)||0));
+      $('dailyChart').innerHTML = visible.map(day => {
+        const count = Number(day.count)||0;
+        const height = Math.max(4, count/max*100);
+        const label = String(day.day || '').slice(5);
+        return `<div class="chart-col" title="${escapeHtml(day.day)}: ${count} messages"><div class="val">${count}</div><div class="stem-wrap"><div class="stem" style="height:${height}%"></div></div><div class="lbl">${escapeHtml(label)}</div></div>`;
+      }).join('');
+    }
+    function renderSnapshot(data) {
+      const fb = data.feedback || {};
+      const totalFb = (Number(fb.up)||0) + (Number(fb.down)||0);
+      const metrics = [
+        {label:'User-to-assistant ratio',value:`${data.user_messages ?? 0} : ${data.assistant_messages ?? 0}`,pct: data.user_messages ? Math.min(100,(data.assistant_messages/data.user_messages)*100) : 0},
+        {label:'Feedback participation',value:totalFb.toLocaleString(),pct:Math.min(100,totalFb/Math.max(1,Number(data.total_messages)||1)*100)},
+        {label:'Messages per conversation',value:Number(data.messages_per_conversation||0).toFixed(1),pct:Math.min(100,Number(data.messages_per_conversation||0)*10)}
+      ];
+      $('snapshotBars').innerHTML = metrics.map(m => `<div><div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:.78rem"><span style="color:var(--dash-muted)">${m.label}</span><strong style="color:var(--dash-text)">${m.value}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(0,m.pct)}%"></div></div></div>`).join('');
+    }
+    function renderConversations() {
+      const query = $('conversationSearch').value.trim().toLowerCase();
+      let rows = conversationRows.filter(c => `${c.title || ''} ${c.conversation_id || ''}`.toLowerCase().includes(query));
+      const sort = $('conversationSort').value;
+      if (sort === 'title') rows.sort((a,b) => String(a.title||'').localeCompare(String(b.title||'')));
+      else rows.sort((a,b) => {
+        const diff = String(a.updated_at||'').localeCompare(String(b.updated_at||''));
+        return sort === 'oldest' ? diff : -diff;
+      });
+      if (!rows.length) {
+        $('recentBody').innerHTML = '<tr><td colspan="4" class="empty-note">No matching conversations.</td></tr>';
+        return;
+      }
+      $('recentBody').innerHTML = rows.map(c => {
+        const id = String(c.conversation_id || '');
+        const title = c.title || 'New chat';
+        const updated = c.updated_at || '';
+        return `<tr><td><div class="conversation-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div><span class="conversation-meta">Conversation history</span></td><td>${escapeHtml(updated)}</td><td><span class="pill" title="${escapeHtml(id)}">${escapeHtml(id.slice(0,8))}${id.length>8?'…':''}</span></td><td><button class="open-btn" type="button" data-open-id="${escapeHtml(id)}">Open chat ↗</button></td></tr>`;
+      }).join('');
+    }
+    async function openConversation(id, button) {
+      if (!id) return;
+      const original = button ? button.textContent : 'Open chat ↗';
+      if (button) { button.disabled = true; button.textContent = 'Opening…'; }
+      $('conversationStatus').textContent = 'Opening conversation…';
+      try {
+        const response = await fetch(`/api/conversations/${encodeURIComponent(id)}/open`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not open this conversation.');
+        window.location.href = '/';
+      } catch (error) {
+        $('conversationStatus').textContent = error.message || 'Could not open this conversation.';
+        if (button) { button.disabled = false; button.textContent = original; }
+      }
+    }
+    function renderDashboard(data) {
+      analyticsData = data;
+      $('updatedAt').textContent = 'Updated ' + new Date().toLocaleString();
+      [
+        ['kMessages',data.total_messages],['kConvos',data.total_conversations],
+        ['kUser',data.user_messages],['kAssistant',data.assistant_messages],
+        ['kAvgLen',data.avg_user_message_length],['kUsers',data.registered_users],
+        ['kMemories',data.memory_count]
+      ].forEach(([id,value]) => animateNumber($(id), value ?? 0));
+      $('kMsgPerConvo').textContent = `${data.messages_per_conversation ?? 0} msgs / conversation`;
+      const fb = data.feedback || {};
+      const up = Number(fb.up)||0, down = Number(fb.down)||0, total = up+down;
+      $('kFeedback').textContent = `${up} helpful · ${down} not helpful`;
+      $('kSat').textContent = data.satisfaction_rate != null ? `${data.satisfaction_rate}%` : '—';
+      $('feedbackUp').textContent = up.toLocaleString();
+      $('feedbackDown').textContent = down.toLocaleString();
+      $('feedbackUpBar').style.width = `${total ? up/total*100 : 0}%`;
+      $('feedbackDownBar').style.width = `${total ? down/total*100 : 0}%`;
+      $('feedbackNote').textContent = total ? `${total.toLocaleString()} feedback ratings recorded; ${data.satisfaction_rate ?? 0}% of ratings were helpful.` : 'No feedback ratings yet. Use the thumbs-up or thumbs-down controls on assistant replies.';
+      drawMini('miniMessages', data.daily_activity);
+
+      const peak = data.peak_day;
+      const topIntent = data.top_intents && data.top_intents[0] ? data.top_intents[0].intent : 'not available';
+      const insightText = `Tracking ${Number(data.total_conversations||0).toLocaleString()} conversations and ${Number(data.total_messages||0).toLocaleString()} messages. Most common intent: ${topIntent}.`;
+      const peakText = peak ? ` Busiest available day: ${peak.day} (${peak.count} messages).` : '';
+      const satisfactionText = data.satisfaction_rate != null ? ` Feedback satisfaction: ${data.satisfaction_rate}%.` : ' No feedback ratings have been submitted yet.';
+      $('insightBox').innerHTML = `<span class="insight-icon">✧</span><div><strong>Analytics summary</strong><br>${escapeHtml(insightText + peakText + satisfactionText)}</div>`;
+      renderActivity(data);
+      renderSentiment(data.sentiments || {});
+      renderBars('intentBars', data.top_intents || [], 'intent', 12);
+      renderBars('sourceBars', data.sources || [], 'source', 8);
+      renderSnapshot(data);
+      conversationRows = data.recent_conversations || [];
+      renderConversations();
+    }
+    async function loadAnalytics() {
+      $('refreshBtn').disabled = true;
+      $('refreshBtn').textContent = '↻ Loading…';
+      try {
+        const response = await fetch('/api/analytics', {headers:{'Accept':'application/json'}, cache:'no-store'});
+        if (!response.ok) throw new Error(`Analytics request failed (${response.status}).`);
+        const data = await response.json();
+        renderDashboard(data);
+      } catch (error) {
+        console.error('Analytics load failed:', error);
+        $('insightBox').innerHTML = `<span class="insight-icon">!</span><div><strong>Could not load analytics.</strong><br>${escapeHtml(error.message || 'Please refresh the page.')}</div>`;
+      } finally {
+        $('refreshBtn').disabled = false;
+        $('refreshBtn').textContent = '↻ Refresh';
+      }
+    }
+    function exportCsv() {
+      if (!analyticsData) { $('conversationStatus').textContent = 'Analytics are still loading.'; return; }
+      const rows = [['Section','Metric','Value']];
+      const d = analyticsData;
+      const basic = {
+        total_messages:d.total_messages,total_conversations:d.total_conversations,user_messages:d.user_messages,
+        assistant_messages:d.assistant_messages,avg_user_message_length:d.avg_user_message_length,
+        satisfaction_rate:d.satisfaction_rate,registered_users:d.registered_users,memory_count:d.memory_count,
+        messages_per_conversation:d.messages_per_conversation
+      };
+      Object.entries(basic).forEach(([key,value]) => rows.push(['Summary',key,value ?? '']));
+      Object.entries(d.sentiments || {}).forEach(([key,value]) => rows.push(['Sentiment',key,value]));
+      (d.top_intents || []).forEach(item => rows.push(['Intent',item.intent,item.count]));
+      (d.sources || []).forEach(item => rows.push(['Source',item.source,item.count]));
+      Object.entries(d.feedback || {}).forEach(([key,value]) => rows.push(['Feedback',key,value]));
+      (d.daily_activity || []).forEach(item => rows.push(['Daily activity',item.day,item.count]));
+      (d.recent_conversations || []).forEach(item => rows.push(['Conversation',item.title || 'New chat',`${item.updated_at || ''} | ${item.conversation_id || ''}`]));
+      const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+      const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `chatbot-analytics-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      $('conversationStatus').textContent = 'Analytics CSV exported.';
+    }
+
+    $('themeToggle').addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('dashboard-theme', next); } catch (_) {}
+      $('themeToggle').textContent = next === 'dark' ? '☀ Light mode' : '☾ Dark mode';
+    });
+    $('mobileNavToggle').addEventListener('click', () => {
+      const sidebar = $('dashSidebar');
+      const open = sidebar.classList.toggle('open');
+      $('mobileNavToggle').setAttribute('aria-expanded', String(open));
+    });
+    $('refreshBtn').addEventListener('click', loadAnalytics);
+    $('exportBtn').addEventListener('click', exportCsv);
+    $('activityRange').addEventListener('change', () => analyticsData && renderActivity(analyticsData));
+    $('conversationSearch').addEventListener('input', renderConversations);
+    $('conversationSort').addEventListener('change', renderConversations);
+    $('sortTitle').addEventListener('click', () => {
+      conversationRows.sort((a,b) => titleSortDirection * String(a.title||'').localeCompare(String(b.title||'')));
+      titleSortDirection *= -1; renderConversations();
+    });
+    $('sortUpdated').addEventListener('click', () => {
+      conversationRows.sort((a,b) => updatedSortDirection * String(a.updated_at||'').localeCompare(String(b.updated_at||'')));
+      updatedSortDirection *= -1; renderConversations();
+    });
+    $('recentBody').addEventListener('click', event => {
+      const button = event.target.closest('[data-open-id]');
+      if (button) openConversation(button.dataset.openId, button);
+    });
+    document.querySelectorAll('.side-nav a[href^="#"]').forEach(link => link.addEventListener('click', () => {
+      if (window.innerWidth <= 800) {
+        $('dashSidebar').classList.remove('open');
+        $('mobileNavToggle').setAttribute('aria-expanded','false');
+      }
+    }));
+    if (document.documentElement.dataset.theme === 'dark') $('themeToggle').textContent = '☀ Light mode';
+    loadAnalytics();
+    setInterval(loadAnalytics, 60000);
+  </script>
+</body>
+</html>

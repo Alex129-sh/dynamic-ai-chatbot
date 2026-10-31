@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef2ff">
+  <title>Dynamic AI Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .history-section{margin:22px 0 16px;min-height:120px}
+    .history-heading{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px;font-size:.72rem;font-weight:800;letter-spacing:.12em;color:#77809a}
+    .history-list{display:flex;flex-direction:column;gap:6px;max-height:310px;overflow-y:auto;padding-right:3px}
+    .history-item{display:flex;align-items:center;gap:5px;width:100%;border:1px solid transparent;border-radius:12px;padding:9px 8px;background:transparent;color:#4c5570;text-align:left;cursor:pointer;font:inherit;min-width:0}
+    .history-item:hover{background:var(--surface-2,#f0f2fb)}.history-item.active{background:#ecebff;border-color:#dcd9ff;color:#4038a5}
+    .history-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
+    .history-actions{display:flex;gap:2px;opacity:.45}.history-item:hover .history-actions,.history-item.active .history-actions{opacity:1}
+    .history-action{border:0;background:transparent;border-radius:6px;padding:3px 4px;cursor:pointer;color:inherit;font-size:.8rem}.history-action:hover{background:var(--surface,#fff)}
+    .history-empty{font-size:.83rem;color:#8991a8;padding:8px 2px;line-height:1.5}
+    .history-loading{font-size:.82rem;color:#8991a8;padding:8px 2px}
+    .language-row{display:flex;align-items:center;gap:10px;margin:0 0 10px;color:#77809a;font-size:.82rem}
+    .language-row label{font-weight:700;white-space:nowrap}
+    .language-row select{max-width:100%;border:1px solid #e2e6f2;border-radius:10px;padding:8px 10px;background:var(--input-bg,#fbfcfe);color:var(--text,#1f2937);font:inherit;outline-offset:2px}
+    .voice-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;color:#77809a;font-size:.78rem}
+    .voice-btn,.speak-btn{border:1px solid #e1e5f2;background:var(--surface,#fff);color:var(--text,#1f2937);border-radius:10px;padding:8px 11px;font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+    .voice-btn:hover,.speak-btn:hover{background:#f1f0ff;border-color:#c9c4ff}
+    .voice-btn:disabled{opacity:.45;cursor:not-allowed}
+    .voice-btn.recording{background:#fff0f0;border-color:#f0a5a5;color:#b42318}
+    .voice-status{min-height:1.2em;line-height:1.4}
+    .message-voice-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .speak-btn{font-size:.78rem;padding:6px 9px}
+    .memory-help{font-size:.78rem;line-height:1.45;color:#8991a8;margin:0 0 8px}
+    .memory-item{display:flex;align-items:flex-start;gap:6px;padding:8px;border-radius:10px;background:var(--surface-2,#f7f8fc);color:var(--text,#4c5570);font-size:.8rem;line-height:1.4}
+    .memory-text{flex:1;min-width:0;overflow-wrap:anywhere}
+    .memory-delete{border:0;background:transparent;color:#8991a8;cursor:pointer;font-size:1rem;padding:0 3px}
+    .memory-delete:hover{color:#b42318}
+    .pdf-panel{margin:0 0 12px;padding:12px 14px;border:1px solid var(--border,#e4e7ef);border-radius:14px;background:var(--surface,#fff)}
+    .pdf-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.86rem;font-weight:700;margin-bottom:8px}
+    .pdf-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .pdf-controls input[type=file]{max-width:100%;font-size:.8rem}
+    .pdf-btn{border:1px solid #d9deea;background:#f7f8fc;color:#36415e;border-radius:9px;padding:7px 10px;cursor:pointer;font-size:.82rem}
+    .pdf-btn:disabled{opacity:.55;cursor:wait}
+    .pdf-select{max-width:100%;padding:7px;border:1px solid #d9deea;border-radius:9px;font-size:.82rem}
+    .pdf-status{font-size:.78rem;color:#78819a;margin-top:7px;min-height:1em}
+    .chat-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .export-chat-btn{border:1px solid #d9deea;background:var(--surface,#fff);color:var(--text,#1f2937);border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit;font-size:.85rem}
+    .export-chat-btn:hover{background:#f1f0ff;border-color:#c9c4ff}
+    .export-chat-btn:disabled{opacity:.55;cursor:wait}
+    @media(max-width:800px){.history-list{max-height:180px}.history-section{margin-top:14px}.voice-controls{gap:6px}.voice-btn{padding:8px 9px}}
+
+    .user-badge{font-size:.82rem;font-weight:700;color:var(--primary,#5b5fc7);padding:6px 10px;border-radius:999px;background:var(--primary-soft,#ecebff);border:1px solid var(--border,#e4e7ef)}
+    .auth-modal{position:fixed;inset:0;background:rgba(15,17,23,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+    .auth-modal[hidden]{display:none!important}
+    .auth-card{width:min(400px,100%);background:var(--surface,#fff);color:var(--text,#1f2937);border:1px solid var(--border,#e4e7ef);border-radius:16px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+    .auth-tabs{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+    .auth-tab{border:0;background:transparent;color:var(--muted,#6b7280);font-weight:700;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .auth-tab.active{background:var(--primary-soft,#ecebff);color:var(--primary,#5b5fc7)}
+    .auth-close{margin-left:auto;border:0;background:transparent;font-size:1.4rem;cursor:pointer;color:var(--muted,#6b7280);line-height:1}
+    .auth-form{display:flex;flex-direction:column;gap:10px}.auth-form[hidden]{display:none!important}
+    .auth-form label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600;color:var(--muted,#6b7280)}
+    .auth-form input{border:1px solid var(--border,#e4e7ef);border-radius:10px;padding:10px 12px;background:var(--input-bg,#fbfcfe);color:var(--text,#1f2937);font:inherit}
+    .auth-form button[type=submit]{border:0;border-radius:10px;padding:11px;background:linear-gradient(135deg,#5b5fc7,#7c3aed);color:#fff;font-weight:700;cursor:pointer}
+    .auth-error{color:#b42318;font-size:.82rem;min-height:1.2em;margin:0}
+  </style>
+  <!-- Marked converts Markdown to HTML; DOMPurify sanitizes it before rendering. -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="Dynamic AI Chatbot home">
+    <span class="brand-mark">🤖</span>
+    <span class="brand-copy"><strong>Dynamic AI Chatbot</strong><small>Context-aware assistant</small></span>
+  </a>
+  <div class="top-actions">
+    <button id="themeToggle" class="theme-toggle" type="button" title="Switch theme">🌓 Theme</button>
+    <span class="online-pill"><span class="dot"></span> Assistant ready</span>
+    <span id="userBadge" class="user-badge" hidden></span>
+    <button id="loginBtn" class="theme-toggle" type="button">Log in</button>
+    <button id="logoutBtn" class="theme-toggle" type="button" hidden>Log out</button>
+    <a class="dashboard-link" href="/dashboard">Analytics <span aria-hidden="true">↗</span></a>
+  </div>
+</header>
+
+<!-- Auth modal -->
+<div id="authModal" class="auth-modal" hidden>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Log in</button>
+      <button type="button" class="auth-tab" data-tab="register">Register</button>
+      <button type="button" class="auth-close" id="authClose" aria-label="Close">×</button>
+    </div>
+    <form id="loginForm" class="auth-form">
+      <label>Username <input name="username" required minlength="3" autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required minlength="6" autocomplete="current-password"></label>
+      <button type="submit">Log in</button>
+      <p class="auth-error" id="loginError"></p>
+    </form>
+    <form id="registerForm" class="auth-form" hidden>
+      <label>Username <input name="username" required minlength="3" autocomplete="username"></label>
+      <label>Display name <input name="display_name" autocomplete="name" placeholder="Optional"></label>
+      <label>Password <input name="password" type="password" required minlength="6" autocomplete="new-password"></label>
+      <button type="submit">Create account</button>
+      <p class="auth-error" id="registerError"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Webcam capture modal -->
+<div id="cameraModal" class="auth-modal" hidden>
+  <div class="auth-card" style="width:min(520px,100%)">
+    <div class="auth-tabs">
+      <strong style="flex:1">Camera</strong>
+      <button type="button" class="auth-close" id="cameraClose" aria-label="Close">×</button>
+    </div>
+    <video id="cameraVideo" autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:360px"></video>
+    <canvas id="cameraCanvas" style="display:none"></canvas>
+    <p id="cameraError" class="auth-error"></p>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button type="button" id="cameraCaptureBtn" class="theme-toggle" style="background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;border:0">📸 Capture photo</button>
+      <button type="button" id="cameraFileFallback" class="theme-toggle">📁 Choose from files</button>
+      <button type="button" id="cameraCancelBtn" class="theme-toggle">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+<main class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">🤖</div>
+      <div>
+        <div class="sidebar-name">Dynamic</div>
+        <div class="sidebar-name">AI Chatbot</div>
+      </div>
+    </div>
+
+    <nav class="side-nav" aria-label="Main">
+      <button type="button" class="side-nav-item active" id="navNewChat">
+        <span class="nav-ico">💬</span> New Chat
+      </button>
+      <button type="button" class="side-nav-item" id="navHistory">
+        <span class="nav-ico">🕐</span> Chat History
+        <span id="historyCount" class="nav-count">0</span>
+      </button>
+      <a class="side-nav-item" href="/dashboard" id="navAnalytics">
+        <span class="nav-ico">📊</span> Analytics
+      </a>
+      <button type="button" class="side-nav-item" id="navSettings">
+        <span class="nav-ico">⚙️</span> Settings
+      </button>
+    </nav>
+
+    <div id="historyPanel" class="history-panel" hidden>
+      <div class="history-heading"><span>Conversations</span></div>
+      <div id="historyList" class="history-list"><div class="history-loading">Loading…</div></div>
+    </div>
+
+    <div id="settingsPanel" class="settings-panel" hidden>
+      <div class="history-heading"><span>Settings</span></div>
+      <button type="button" class="side-nav-item" id="themeToggleSide">🌓 Theme</button>
+      <button type="button" class="side-nav-item" id="loginBtnSide">Log in</button>
+      <button type="button" class="side-nav-item" id="logoutBtnSide" hidden>Log out</button>
+      <section class="memory-section" aria-label="Saved memories">
+        <div class="history-heading"><span>Memory</span>
+          <button id="refreshMemoriesBtn" class="history-action" type="button" title="Refresh">↻</button>
+        </div>
+        <p class="memory-help">Say “Remember that…” to save a fact.</p>
+        <div id="memoryList" class="history-list"><div class="history-loading">Loading…</div></div>
+      </section>
+    </div>
+
+    <div class="sidebar-footer">
+      <span class="leaf">🌿</span>
+      <span>Smart. Helpful.<br>Always Here.</span>
+    </div>
+  </aside>
+
+  <section class="chat-panel" aria-label="Chat with AI assistant">
+    <div class="chat-heading">
+      <div><div class="eyebrow">YOUR AI ASSISTANT</div><h1>Let's talk<span class="heading-period">.</span></h1><p>What would you like to work on today?</p></div>
+      <div class="chat-heading-actions">
+        <button id="exportChatBtn" class="export-chat-btn" type="button" title="Download this conversation as a text file">⇩ Export chat</button>
+        <button id="clearBtn" class="new-chat-btn" type="button"><span aria-hidden="true">＋</span> New chat</button>
+      </div>
+    </div>
+
+    <div id="messages" class="messages" aria-live="polite" aria-label="Conversation">
+      <div class="welcome">
+        <div class="welcome-orb">🤖</div>
+        <h2>How can I help today?</h2>
+        <p>Ask a question or choose a suggestion to get started.</p>
+        <div class="welcome-prompts">
+          <button type="button" data-prompt="Explain artificial intelligence in simple words."><span>✧</span> Explain AI simply</button>
+          <button type="button" data-prompt="Help me brainstorm a project idea."><span>↗</span> Brainstorm a project</button>
+          <button type="button" data-prompt="Teach me something interesting today."><span>✦</span> Teach me something</button>
+        </div>
+      </div>
+    </div>
+
+    <form id="chatForm" class="composer">
+      <!-- Attached files chips (shown above input when files are ready) -->
+      <div id="docChips" class="doc-chips" style="margin-bottom:8px"></div>
+      <div id="pdfStatus" class="pdf-status" role="status" aria-live="polite" style="margin:0 0 6px;min-height:0"></div>
+
+      <div class="language-row">
+        <label for="languageSelect">Response language</label>
+        <select id="languageSelect" aria-label="Choose response language">
+          <option value="auto" selected>Auto (match my message)</option>
+          <option value="english">English</option>
+          <option value="hindi">Hindi (हिन्दी)</option>
+          <option value="hinglish">Hinglish (Roman + English)</option>
+          <option value="marathi">Marathi (मराठी)</option>
+          <option value="gujarati">Gujarati (ગુજરાતી)</option>
+          <option value="bengali">Bengali (বাংলা)</option>
+          <option value="tamil">Tamil (தமிழ்)</option>
+          <option value="telugu">Telugu (తెలుగు)</option>
+          <option value="kannada">Kannada (ಕನ್ನಡ)</option>
+          <option value="malayalam">Malayalam (മലയാളം)</option>
+          <option value="punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+          <option value="urdu">Urdu (اردو)</option>
+          <option value="spanish">Spanish (Español)</option>
+          <option value="french">French (Français)</option>
+          <option value="german">German (Deutsch)</option>
+          <option value="arabic">Arabic (العربية)</option>
+          <option value="chinese">Chinese (中文)</option>
+          <option value="japanese">Japanese (日本語)</option>
+        </select>
+      </div>
+      <div class="voice-controls">
+        <button id="micBtn" class="voice-btn" type="button" aria-pressed="false" title="Speak to fill the message box">🎤 Speak</button>
+        <button id="stopSpeechBtn" class="voice-btn" type="button" title="Stop spoken response">⏹ Stop audio</button>
+        <span id="voiceStatus" class="voice-status" role="status" aria-live="polite">Voice input uses your browser's speech recognition.</span>
+      </div>
+
+      <!-- Hidden file inputs -->
+      <input id="pdfFile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.xls,.csv,.txt,application/pdf,image/*" multiple style="display:none" aria-hidden="true">
+      <input id="cameraFile" type="file" accept="image/*" capture="environment" style="display:none" aria-hidden="true">
+
+      <!-- Composer row: + button | textarea | Send -->
+      <div class="composer-row">
+        <div class="attach-wrap">
+          <button id="attachBtn" class="attach-btn" type="button" title="Add file or photo" aria-label="Add attachment" aria-expanded="false" aria-haspopup="menu">+</button>
+          <div id="attachMenu" class="attach-menu" role="menu" hidden>
+            <button type="button" class="attach-menu-item" role="menuitem" id="menuUploadFile">
+              <span class="attach-icon">📎</span>
+              <span>Upload a file</span>
+            </button>
+            <button type="button" class="attach-menu-item" role="menuitem" id="menuCamera">
+              <span class="attach-icon">📷</span>
+              <span>Camera / Photo</span>
+            </button>
+            <div class="attach-menu-hint">PDF, DOCX, PPTX, XLSX, CSV, TXT, images · max 10 MB</div>
+          </div>
+        </div>
+        <label class="sr-only" for="messageInput">Your message</label>
+        <textarea id="messageInput" rows="1" maxlength="4000" placeholder="Message your assistant..." required></textarea>
+        <button id="sendBtn" type="submit"><span>Send</span><span aria-hidden="true">↑</span></button>
+      </div>
+      <div class="composer-bottom">
+        <span class="composer-hint">Enter to send · Shift + Enter for a new line · + to attach files</span>
+      </div>
+    </form>
+    <div class="disclaimer"><span aria-hidden="true">✧</span> AI can make mistakes. Check important information independently.</div>
+  </section>
+</main>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const form = document.getElementById('chatForm');
+const input = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const languageSelect = document.getElementById('languageSelect');
+const historyList = document.getElementById('historyList');
+const pdfFile = document.getElementById('pdfFile');
+const cameraFile = document.getElementById('cameraFile');
+const pdfStatus = document.getElementById('pdfStatus');
+const attachBtn = document.getElementById('attachBtn');
+const attachMenu = document.getElementById('attachMenu');
+const menuUploadFile = document.getElementById('menuUploadFile');
+const menuCamera = document.getElementById('menuCamera');
+const historyCount = document.getElementById('historyCount');
+let currentConversationId = null;
+/** Documents attached for the next message: [{id, name, type, pages}] */
+let attachedDocs = [];
+let allDocs = []; // recent uploads for previous-file questions
+const micBtn = document.getElementById('micBtn');
+const stopSpeechBtn = document.getElementById('stopSpeechBtn');
+const voiceStatus = document.getElementById('voiceStatus');
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isRecognizing = false;
+
+function setVoiceStatus(message) { voiceStatus.textContent = message; }
+function recognitionLanguage() {
+  const map = {
+    hindi: 'hi-IN', marathi: 'mr-IN', gujarati: 'gu-IN', bengali: 'bn-IN',
+    tamil: 'ta-IN', telugu: 'te-IN', kannada: 'kn-IN', malayalam: 'ml-IN',
+    punjabi: 'pa-IN', urdu: 'ur-IN', spanish: 'es-ES', french: 'fr-FR',
+    german: 'de-DE', arabic: 'ar-SA', chinese: 'zh-CN', japanese: 'ja-JP',
+    english: 'en-IN', hinglish: 'en-IN', auto: 'en-IN',
+  };
+  return map[languageSelect.value] || 'en-IN';
+}
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onstart = () => {
+    isRecognizing = true; micBtn.classList.add('recording');
+    micBtn.textContent = '⏹ Stop listening'; micBtn.setAttribute('aria-pressed', 'true');
+    setVoiceStatus('Listening… speak clearly, then pause.');
+  };
+  recognition.onresult = event => {
+    let finalText = ''; let interimText = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += transcript; else interimText += transcript;
+    }
+    if (finalText) {
+      input.value = (input.value ? input.value.trim() + ' ' : '') + finalText.trim();
+      input.dispatchEvent(new Event('input')); input.focus();
+      setVoiceStatus('Speech added to the message box. Review it, then press Send.');
+    } else if (interimText) setVoiceStatus('Recognizing: ' + interimText);
+  };
+  recognition.onerror = event => {
+    const messages = { 'not-allowed': 'Microphone permission was denied. Allow microphone access in your browser.', 'no-speech': 'No speech detected. Try again.', 'audio-capture': 'No microphone was found. Check your device settings.', 'network': 'Speech recognition needs a working network connection.' };
+    setVoiceStatus(messages[event.error] || ('Voice input error: ' + event.error));
+  };
+  recognition.onend = () => {
+    isRecognizing = false; micBtn.classList.remove('recording');
+    micBtn.textContent = '🎤 Speak'; micBtn.setAttribute('aria-pressed', 'false');
+  };
+} else {
+  micBtn.disabled = true;
+  micBtn.title = 'Speech recognition is not supported by this browser. Try Chrome or Edge.';
+  setVoiceStatus('Speech input is not supported here. Try Chrome or Edge.');
+}
+micBtn.addEventListener('click', () => {
+  if (!recognition) return;
+  if (isRecognizing) { recognition.stop(); return; }
+  try { recognition.lang = recognitionLanguage(); recognition.start(); }
+  catch (error) { setVoiceStatus('Could not start the microphone. Wait a moment and try again.'); }
+});
+stopSpeechBtn.addEventListener('click', () => {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  setVoiceStatus('Audio stopped.');
+});
+function markdownToPlainText(markdown) {
+  const parsed = window.marked ? marked.parse(String(markdown || '')) : String(markdown || '');
+  const holder = document.createElement('div');
+  holder.innerHTML = window.DOMPurify ? DOMPurify.sanitize(parsed) : parsed;
+  return (holder.textContent || holder.innerText || '').replace(/\s+/g, ' ').trim();
+}
+function speechLanguage(text) {
+  const map = {
+    hindi: 'hi-IN', marathi: 'mr-IN', gujarati: 'gu-IN', bengali: 'bn-IN',
+    tamil: 'ta-IN', telugu: 'te-IN', kannada: 'kn-IN', malayalam: 'ml-IN',
+    punjabi: 'pa-IN', urdu: 'ur-IN', spanish: 'es-ES', french: 'fr-FR',
+    german: 'de-DE', arabic: 'ar-SA', chinese: 'zh-CN', japanese: 'ja-JP',
+    english: 'en-IN', hinglish: 'en-IN',
+  };
+  const selected = languageSelect.value;
+  if (map[selected]) return map[selected];
+  if (/[\u0900-\u097F]/.test(text)) return 'hi-IN';
+  return 'en-IN';
+}
+function speakText(text) {
+  if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
+    setVoiceStatus('Spoken responses are not supported by this browser.'); return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(markdownToPlainText(text));
+  utterance.lang = speechLanguage(text); utterance.rate = 1; utterance.pitch = 1;
+  utterance.onstart = () => setVoiceStatus('Playing AI response aloud…');
+  utterance.onend = () => setVoiceStatus('Finished playing response.');
+  utterance.onerror = () => setVoiceStatus('Could not play audio. Check your browser audio settings.');
+  window.speechSynthesis.speak(utterance);
+}
+
+const savedLanguage = localStorage.getItem('chatbot-response-language');
+const LANGS = ['auto','english','hindi','hinglish','marathi','gujarati','bengali','tamil','telugu','kannada','malayalam','punjabi','urdu','spanish','french','german','arabic','chinese','japanese'];
+if (savedLanguage && LANGS.includes(savedLanguage)) languageSelect.value = savedLanguage;
+languageSelect.addEventListener('change', () => localStorage.setItem('chatbot-response-language', languageSelect.value));
+
+/* Theme: light | dark | system (default) */
+const themeToggle = document.getElementById('themeToggle');
+const THEME_KEY = 'chatbot-theme';
+function resolveTheme(pref) {
+  if (pref === 'dark' || pref === 'light') return pref;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(pref) {
+  const resolved = resolveTheme(pref);
+  document.documentElement.setAttribute('data-theme', resolved);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = resolved === 'dark' ? '#0f1117' : '#f7f8fc';
+  if (themeToggle) {
+    const label = pref === 'dark' ? '🌙 Dark' : pref === 'light' ? '☀️ Light' : '🌓 Auto';
+    themeToggle.textContent = label;
+    themeToggle.title = 'Theme: ' + (pref || 'system') + ' (click to cycle)';
+  }
+}
+let themePref = localStorage.getItem(THEME_KEY) || 'system';
+applyTheme(themePref);
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const order = ['system', 'light', 'dark'];
+    const i = order.indexOf(themePref);
+    themePref = order[(i + 1) % order.length];
+    localStorage.setItem(THEME_KEY, themePref);
+    applyTheme(themePref);
+  });
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (themePref === 'system') applyTheme('system');
+});
+
+if (window.marked) marked.setOptions({ breaks: true, gfm: true });
+
+function renderMarkdown(target, text) {
+  if (window.marked && window.DOMPurify) {
+    target.innerHTML = DOMPurify.sanitize(marked.parse(String(text || '')));
+  } else target.textContent = String(text || '');
+}
+function scrollToLatest() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+function showWelcome() {
+  messagesEl.innerHTML = `<div class="welcome"><div class="welcome-orb">🤖</div><h2>How can I help today?</h2><p>Ask a question or choose a suggestion to get started.</p><div class="welcome-prompts"><button type="button" data-prompt="Explain artificial intelligence in simple words."><span>✧</span> Explain AI simply</button><button type="button" data-prompt="Help me brainstorm a project idea."><span>↗</span> Brainstorm a project</button><button type="button" data-prompt="Teach me something interesting today."><span>✦</span> Teach me something</button></div></div>`;
+  bindPromptButtons(messagesEl);
+}
+
+function formatLocalTime(value) {
+  if (!value) return '';
+  // DB stores UTC as "YYYY-MM-DD HH:MM:SS" without timezone
+  let s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+    s = s.replace(' ', 'T');
+    if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+function formatLocalTimeShort(value) {
+  if (!value) return '';
+  let s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+    s = s.replace(' ', 'T');
+    if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) s += 'Z';
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true });
+  }
+  return d.toLocaleString(undefined, {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+  });
+}
+
+function addMessage(role, text, meta = null, id = null) {
+  const welcome = messagesEl.querySelector('.welcome');
+  if (welcome) welcome.remove();
+  const wrap = document.createElement('article');
+  wrap.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  if (role === 'user') label.textContent = 'YOU';
+  else label.innerHTML = '<span class="assistant-mini-mark">✦</span> AI ASSISTANT';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble markdown-body';
+  if (role === 'assistant') renderMarkdown(bubble, text); else bubble.textContent = text;
+  wrap.append(label, bubble);
+  if (meta && meta.created_at) {
+    const t = document.createElement('div');
+    t.className = 'msg-time';
+    t.textContent = formatLocalTime(meta.created_at);
+    wrap.append(t);
+  }
+  if (role === 'assistant' && meta) {
+
+    const info = document.createElement('div');
+    info.className = 'metadata';
+    info.textContent = `Sentiment: ${meta.sentiment || 'n/a'} · Intent: ${meta.intent || 'n/a'} · Source: ${meta.source || 'n/a'}`;
+    wrap.append(info);
+    if (id) {
+      const actions = document.createElement('div'); actions.className = 'feedback';
+      for (const [rating, labelText] of [['up', '👍 Helpful'], ['down', '👎 Not helpful']]) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'feedback-btn'; b.textContent = labelText;
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try {
+            const response = await fetch('/api/feedback', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message_id:id,rating})});
+            if (!response.ok) throw new Error('Feedback could not be saved');
+            b.textContent = '✓ Feedback saved'; b.classList.add('saved');
+          } catch (error) { b.disabled = false; b.textContent = 'Try again'; }
+        });
+        actions.append(b);
+      }
+      wrap.append(actions);
+    }
+    const voiceActions = document.createElement('div'); voiceActions.className = 'message-voice-actions';
+    const speakBtn = document.createElement('button'); speakBtn.type = 'button'; speakBtn.className = 'speak-btn'; speakBtn.textContent = '🔊 Listen';
+    speakBtn.setAttribute('aria-label', 'Read this assistant response aloud');
+    speakBtn.addEventListener('click', () => speakText(text));
+    voiceActions.append(speakBtn);
+    wrap.append(voiceActions);
+  }
+  messagesEl.append(wrap);
+  scrollToLatest();
+}
+function renderMessages(messages) {
+  messagesEl.innerHTML = '';
+  if (!messages || !messages.length) { showWelcome(); return; }
+  messages.forEach(m => addMessage(m.role, m.content,
+    ({sentiment:m.sentiment,intent:m.intent,source:m.source,created_at:m.created_at}),
+    m.role === 'assistant' ? m.id : null));
+}
+async function loadHistory() {
+  try {
+    const response = await fetch('/api/history');
+    if (!response.ok) return;
+    const data = await response.json();
+    currentConversationId = data.conversation_id || currentConversationId;
+    renderMessages(data.messages || []);
+  } catch (error) { console.error('Could not load conversation history:', error); }
+}
+function bindPromptButtons(root=document) {
+  root.querySelectorAll('[data-prompt]').forEach(button => {
+    if (button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => {
+      input.value = button.dataset.prompt || ''; input.focus(); input.style.height='auto';
+      input.style.height = Math.min(input.scrollHeight,150)+'px';
+    });
+  });
+}
+async function refreshConversationList() {
+  try {
+    const response = await fetch('/api/conversations');
+    if (!response.ok) throw new Error('Could not load chat history');
+    const data = await response.json();
+    currentConversationId = data.current_conversation_id || currentConversationId;
+    const items = data.conversations || [];
+    historyCount.textContent = String(items.length);
+    historyList.innerHTML = '';
+    if (!items.length) { historyList.innerHTML = '<div class="history-empty">Your conversations will appear here.</div>'; return; }
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'history-item' + (item.conversation_id === currentConversationId ? ' active' : '');
+      row.title = item.title;
+      const title = document.createElement('button'); title.type='button'; title.className='history-action'; title.textContent='◷'; title.setAttribute('aria-label','Open conversation');
+      const text = document.createElement('span'); text.className='history-title';
+      const titleLine = document.createElement('span'); titleLine.className='history-title-main'; titleLine.textContent=item.title || 'New chat';
+      const timeLine = document.createElement('span'); timeLine.className='history-time'; timeLine.textContent=formatLocalTimeShort(item.updated_at || item.created_at);
+      text.append(titleLine);
+      if (timeLine.textContent) text.append(timeLine);
+      const actions = document.createElement('span'); actions.className='history-actions';
+      const rename = document.createElement('button'); rename.type='button'; rename.className='history-action'; rename.textContent='✎'; rename.title='Rename conversation'; rename.setAttribute('aria-label','Rename conversation');
+      const del = document.createElement('button'); del.type='button'; del.className='history-action'; del.textContent='×'; del.title='Delete conversation'; del.setAttribute('aria-label','Delete conversation');
+      const open = () => openConversation(item.conversation_id);
+      title.addEventListener('click', open); text.addEventListener('click', open); text.style.cursor='pointer';
+      rename.addEventListener('click', async event => {
+        event.stopPropagation();
+        const newTitle = prompt('Rename this conversation:', item.title || 'New chat');
+        if (newTitle === null) return;
+        const result = await fetch(`/api/conversations/${encodeURIComponent(item.conversation_id)}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:newTitle})});
+        const payload = await result.json();
+        if (!result.ok) { alert(payload.error || 'Could not rename conversation.'); return; }
+        await refreshConversationList();
+      });
+      del.addEventListener('click', async event => {
+        event.stopPropagation();
+        if (!confirm(`Delete “${item.title}”? This cannot be undone.`)) return;
+        const result = await fetch(`/api/conversations/${encodeURIComponent(item.conversation_id)}`, {method:'DELETE'});
+        const payload = await result.json();
+        if (!result.ok) { alert(payload.error || 'Could not delete conversation.'); return; }
+        if (item.conversation_id === currentConversationId) {
+          currentConversationId = payload.new_conversation_id || null;
+          await loadHistory();
+        }
+        await refreshConversationList();
+      });
+      actions.append(rename, del); row.append(title, text, actions);
+      historyList.append(row);
+    });
+  } catch (error) {
+    console.error(error); historyList.innerHTML='<div class="history-empty">Could not load chat history.</div>';
+  }
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(
+      response.ok
+        ? "Server returned a non-JSON response. Restart the Flask app and try again."
+        : "Server error (" + response.status + "). Restart python app.py and hard-refresh the page."
+    );
+  }
+}
+
+async function openConversation(id) {
+  try {
+    const response = await fetch(`/api/conversations/${encodeURIComponent(id)}/open`, {method:'POST'});
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || 'Could not open conversation');
+    currentConversationId = data.conversation_id;
+    renderMessages(data.messages || []);
+    await refreshConversationList();
+  } catch (error) { alert(error.message); }
+}
+
+async function refreshMemories() {
+  try {
+    const response = await fetch('/api/memories');
+    if (!response.ok) throw new Error('Could not load memories');
+    const data = await response.json();
+    const list = document.getElementById('memoryList');
+    list.innerHTML = '';
+    const items = data.memories || [];
+    if (!items.length) { list.innerHTML = '<div class="history-empty">No saved memories yet.</div>'; return; }
+    items.forEach(item => {
+      const row = document.createElement('div'); row.className = 'memory-item';
+      const content = document.createElement('span'); content.className = 'memory-text'; content.textContent = item.memory;
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'memory-delete'; remove.textContent = '×';
+      remove.title = 'Delete memory'; remove.setAttribute('aria-label', 'Delete memory');
+      remove.addEventListener('click', async () => {
+        if (!confirm('Delete this saved memory?')) return;
+        const result = await fetch(`/api/memories/${item.id}`, { method: 'DELETE' });
+        if (result.ok) await refreshMemories(); else alert('Could not delete this memory.');
+      });
+      row.append(content, remove); list.append(row);
+    });
+  } catch (error) {
+    console.error(error);
+    document.getElementById('memoryList').innerHTML = '<div class="history-empty">Could not load memories.</div>';
+  }
+}
+document.getElementById('refreshMemoriesBtn').addEventListener('click', refreshMemories);
+
+function selectedDocumentIds() {
+  return attachedDocs.map(d => d.id);
+}
+
+function updateDocChips() {
+  const chips = document.getElementById('docChips');
+  if (!chips) return;
+  chips.innerHTML = '';
+  attachedDocs.forEach(doc => {
+    const chip = document.createElement('span');
+    chip.className = 'doc-chip';
+    const name = document.createElement('span');
+    name.className = 'chip-name';
+    name.textContent = doc.name;
+    name.title = doc.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'chip-remove';
+    remove.setAttribute('aria-label', 'Remove ' + doc.name);
+    remove.textContent = '×';
+    remove.addEventListener('click', async () => {
+      try {
+        await fetch(`/api/pdfs/${encodeURIComponent(doc.id)}`, { method: 'DELETE' });
+      } catch (_) { /* ignore */ }
+      attachedDocs = attachedDocs.filter(d => d.id !== doc.id);
+      updateDocChips();
+      pdfStatus.textContent = attachedDocs.length
+        ? `${attachedDocs.length} file(s) attached.`
+        : '';
+    });
+    chip.append(name, remove);
+    chips.appendChild(chip);
+  });
+}
+
+async function refreshPdfs() {
+  try {
+    const response = await fetch('/api/pdfs');
+    if (!response.ok) return;
+    const data = await response.json();
+    const docs = data.documents || [];
+    allDocs = docs.map(d => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      pages: d.pages || 0
+    }));
+    const ids = new Set(docs.map(d => String(d.id)));
+    attachedDocs = attachedDocs.filter(d => ids.has(String(d.id)));
+    // If nothing active, use server active / latest document
+    if (!attachedDocs.length && docs.length) {
+      let active = docs.find(d => String(d.id) === String(data.active_document_id));
+      if (!active) active = docs[docs.length - 1];
+      attachedDocs = [{
+        id: active.id,
+        name: active.name,
+        type: active.type,
+        pages: active.pages || 0
+      }];
+    }
+    updateDocChips();
+  } catch (_) { /* ignore */ }
+}
+
+function closeAttachMenu() {
+  attachMenu.hidden = true;
+  attachBtn.setAttribute('aria-expanded', 'false');
+}
+
+function openAttachMenu() {
+  attachMenu.hidden = false;
+  attachBtn.setAttribute('aria-expanded', 'true');
+}
+
+attachBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (attachMenu.hidden) openAttachMenu();
+  else closeAttachMenu();
+});
+document.addEventListener('click', (e) => {
+  if (!attachMenu.hidden && !attachMenu.contains(e.target) && e.target !== attachBtn) {
+    closeAttachMenu();
+  }
+});
+menuUploadFile.addEventListener('click', () => {
+  closeAttachMenu();
+  pdfFile.click();
+});
+menuCamera.addEventListener('click', () => {
+  closeAttachMenu();
+  openCameraModal();
+});
+
+async function uploadOneFile(file) {
+  if (!file) return;
+  if (pdfStatus) {
+    pdfStatus.style.minHeight = '1.2em';
+    pdfStatus.textContent = 'Uploading ' + file.name + '…';
+  }
+  try {
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('File is larger than 10 MB.');
+    }
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch('/api/upload-document', { method: 'POST', body });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error((data && data.error) || ('Upload failed (' + response.status + ')'));
+    const doc = data.document;
+    if (!doc || !doc.id) throw new Error('Upload succeeded but server returned no document info.');
+    const entry = {
+      id: doc.id,
+      name: doc.name || file.name,
+      type: doc.type || '',
+      pages: doc.pages || 0
+    };
+    // Library of recent uploads (server also keeps them)
+    allDocs = (allDocs || []).filter(d => d.id !== entry.id);
+    allDocs.push(entry);
+    if (allDocs.length > 5) allDocs = allDocs.slice(-5);
+    // Default: only the new file is active for answers
+    attachedDocs = [entry];
+    updateDocChips();
+    if (pdfStatus) {
+      pdfStatus.textContent = 'Using ' + entry.name
+        + (entry.pages ? ' (' + entry.pages + ' pages)' : '')
+        + '. Ask normally for this file, or say “from the previous file” for an older upload.';
+    }
+  } catch (error) {
+    console.error('Upload error', error);
+    if (pdfStatus) pdfStatus.textContent = error.message || 'Upload failed.';
+    alert(error.message || 'Upload failed.');
+  }
+}
+
+pdfFile.addEventListener('change', async () => {
+  const files = Array.from(pdfFile.files || []);
+  pdfFile.value = '';
+  // If user picks several files at once, only the last one is kept active
+  if (!files.length) return;
+  await uploadOneFile(files[files.length - 1]);
+});
+
+/* Webcam capture */
+const cameraModal = document.getElementById('cameraModal');
+const cameraVideo = document.getElementById('cameraVideo');
+const cameraCanvas = document.getElementById('cameraCanvas');
+const cameraError = document.getElementById('cameraError');
+const cameraCaptureBtn = document.getElementById('cameraCaptureBtn');
+const cameraFileFallback = document.getElementById('cameraFileFallback');
+const cameraCancelBtn = document.getElementById('cameraCancelBtn');
+const cameraClose = document.getElementById('cameraClose');
+let cameraStream = null;
+
+async function openCameraModal() {
+  if (!cameraModal) {
+    cameraFile.click();
+    return;
+  }
+  cameraError.textContent = '';
+  cameraModal.hidden = false;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    cameraError.textContent = 'Camera API not available in this browser. Use “Choose from files”.';
+    return;
+  }
+  try {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    cameraVideo.srcObject = cameraStream;
+  } catch (err) {
+    console.error(err);
+    cameraError.textContent = 'Could not open camera (' + (err.name || 'error') + '). Allow camera permission or use “Choose from files”.';
+  }
+}
+
+function closeCameraModal() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  if (cameraVideo) cameraVideo.srcObject = null;
+  if (cameraModal) cameraModal.hidden = true;
+}
+
+async function captureCameraPhoto() {
+  if (!cameraVideo || !cameraCanvas || !cameraStream) {
+    cameraError.textContent = 'Camera is not ready.';
+    return;
+  }
+  const w = cameraVideo.videoWidth || 640;
+  const h = cameraVideo.videoHeight || 480;
+  cameraCanvas.width = w;
+  cameraCanvas.height = h;
+  const ctx = cameraCanvas.getContext('2d');
+  ctx.drawImage(cameraVideo, 0, 0, w, h);
+  const blob = await new Promise(resolve => cameraCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+  if (!blob) {
+    cameraError.textContent = 'Could not capture photo.';
+    return;
+  }
+  const file = new File([blob], 'camera-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+  closeCameraModal();
+  if (typeof uploadOneFile === 'function') {
+    await uploadOneFile(file);
+  } else {
+    cameraError.textContent = 'Upload function not found.';
+  }
+}
+
+if (cameraCaptureBtn) cameraCaptureBtn.addEventListener('click', () => captureCameraPhoto());
+if (cameraCancelBtn) cameraCancelBtn.addEventListener('click', closeCameraModal);
+if (cameraClose) cameraClose.addEventListener('click', closeCameraModal);
+if (cameraFileFallback) cameraFileFallback.addEventListener('click', () => {
+  closeCameraModal();
+  cameraFile.click();
+});
+if (cameraModal) {
+  cameraModal.addEventListener('click', (e) => {
+    if (e.target === cameraModal) closeCameraModal();
+  });
+}
+
+cameraFile.addEventListener('change', async () => {
+  const file = cameraFile.files && cameraFile.files[0];
+  cameraFile.value = '';
+  if (file) await uploadOneFile(file);
+});
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const text = input.value.trim();
+  if (!text || sendBtn.disabled) return;
+  if (recognition && isRecognizing) recognition.stop();
+  addMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="spinner"></span><span>Thinking</span>';
+  const typing = document.createElement('div');
+  typing.className = 'typing-indicator';
+  typing.innerHTML = '<span></span><span></span><span></span><em>Assistant is thinking</em>';
+  messagesEl.append(typing);
+  scrollToLatest();
+  try {
+    const payload = {
+      message: text,
+      language: languageSelect.value,
+      document_ids: selectedDocumentIds()
+    };
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Request failed');
+    currentConversationId = data.conversation_id || currentConversationId;
+    await loadHistory();
+    await refreshConversationList();
+    await refreshMemories();
+  } catch (error) {
+    typing.remove();
+    addMessage('assistant', 'Sorry, something went wrong. Please try again.\n\n' + error.message);
+  } finally {
+    const t = messagesEl.querySelector('.typing-indicator');
+    if (t) t.remove();
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = '<span>Send</span><span aria-hidden="true">↑</span>';
+    input.focus();
+  }
+});
+input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,150)+'px';});
+input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();form.requestSubmit();}});
+
+document.getElementById('exportChatBtn').addEventListener('click', async () => {
+  const exportBtn = document.getElementById('exportChatBtn');
+  const originalText = exportBtn.textContent;
+  exportBtn.disabled = true;
+  exportBtn.textContent = 'Preparing…';
+  try {
+    // Fetch the saved messages for the currently open conversation.
+    const response = await fetch('/api/history');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not load this conversation.');
+    const messages = data.messages || [];
+    if (!messages.length) {
+      alert('There are no messages to export yet.');
+      return;
+    }
+
+    const exportedAt = new Date();
+    const lines = [
+      'Dynamic AI Chatbot — Conversation Export',
+      `Exported: ${exportedAt.toLocaleString()}`,
+      `Conversation ID: ${data.conversation_id || currentConversationId || 'Unknown'}`,
+      '='.repeat(48),
+      ''
+    ];
+    messages.forEach((message, index) => {
+      const role = message.role === 'user' ? 'You' : 'Assistant';
+      const timestamp = message.created_at ? ` (${message.created_at})` : '';
+      lines.push(`${index + 1}. ${role}${timestamp}`);
+      lines.push(String(message.content || ''));
+      if (message.source) lines.push(`Source: ${message.source}`);
+      lines.push('', '-'.repeat(48), '');
+    });
+
+    const blob = new Blob([lines.join('\n')], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStamp = exportedAt.toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `chatbot-conversation-${dateStamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(error.message || 'Could not export this conversation. Please try again.');
+  } finally {
+    exportBtn.disabled = false;
+    exportBtn.textContent = originalText;
+  }
+});
+
+document.getElementById('clearBtn').addEventListener('click',async()=>{
+  try {
+    const response=await fetch('/api/new-chat',{method:'POST'}); if(!response.ok)throw new Error('Could not start a new chat');
+    const data=await response.json(); currentConversationId=data.conversation_id || null;
+    showWelcome(); await refreshConversationList(); input.focus();
+  } catch(error) { console.error(error); alert('Could not start a new chat. Please try again.'); }
+});
+
+
+/* -------- Auth UI -------- */
+const authModal = document.getElementById('authModal');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const userBadge = document.getElementById('userBadge');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+const loginError = document.getElementById('loginError');
+const registerError = document.getElementById('registerError');
+
+function openAuth(tab) {
+  authModal.hidden = false;
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  if (tab === 'login') {
+    loginForm.hidden = false;
+    registerForm.hidden = true;
+    loginForm.style.display = 'flex';
+    registerForm.style.display = 'none';
+  } else {
+    loginForm.hidden = true;
+    registerForm.hidden = false;
+    loginForm.style.display = 'none';
+    registerForm.style.display = 'flex';
+  }
+  loginError.textContent = '';
+  registerError.textContent = '';
+}
+function closeAuth() { authModal.hidden = true; }
+
+loginBtn.addEventListener('click', () => openAuth('login'));
+document.getElementById('authClose').addEventListener('click', closeAuth);
+authModal.addEventListener('click', (e) => { if (e.target === authModal) closeAuth(); });
+document.querySelectorAll('.auth-tab').forEach(tab => {
+  tab.addEventListener('click', () => openAuth(tab.dataset.tab));
+});
+
+function setAuthUI(user) {
+  if (user) {
+    userBadge.hidden = false;
+    userBadge.textContent = '👤 ' + (user.display_name || user.username);
+    loginBtn.hidden = true;
+    logoutBtn.hidden = false;
+  } else {
+    userBadge.hidden = true;
+    userBadge.textContent = '';
+    loginBtn.hidden = false;
+    logoutBtn.hidden = true;
+  }
+}
+
+
+async function switchUserWorkspace() {
+  currentConversationId = null;
+  attachedDocs = [];
+  allDocs = [];
+  if (typeof updateDocChips === 'function') updateDocChips();
+  if (messagesEl) {
+    messagesEl.innerHTML = '';
+    // restore welcome if present in page initially - simple clear
+  }
+  if (typeof loadHistory === 'function') await loadHistory();
+  if (typeof refreshConversationList === 'function') await refreshConversationList();
+  if (typeof refreshMemories === 'function') await refreshMemories();
+  if (typeof refreshPdfs === 'function') await refreshPdfs();
+}
+
+async function refreshAuth() {
+  try {
+    const res = await fetch('/api/me');
+    const data = await res.json();
+    setAuthUI(data.authenticated ? data.user : null);
+  } catch (e) {
+    setAuthUI(null);
+  }
+}
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.textContent = '';
+  const fd = new FormData(loginForm);
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    closeAuth();
+    setAuthUI(data.user);
+    loginForm.reset();
+    await switchUserWorkspace();
+  } catch (err) {
+    loginError.textContent = err.message;
+  }
+});
+
+registerForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  registerError.textContent = '';
+  const fd = new FormData(registerForm);
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: fd.get('username'),
+        password: fd.get('password'),
+        display_name: fd.get('display_name') || fd.get('username')
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Register failed');
+    closeAuth();
+    setAuthUI(data.user);
+    registerForm.reset();
+    await switchUserWorkspace();
+  } catch (err) {
+    registerError.textContent = err.message;
+  }
+});
+
+logoutBtn.addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  setAuthUI(null);
+  await switchUserWorkspace();
+});
+
+refreshAuth();
+
+/* Sidebar nav (mockup layout) */
+const navNewChat = document.getElementById('navNewChat');
+const navHistory = document.getElementById('navHistory');
+const navSettings = document.getElementById('navSettings');
+const historyPanel = document.getElementById('historyPanel');
+const settingsPanel = document.getElementById('settingsPanel');
+const themeToggleSide = document.getElementById('themeToggleSide');
+const loginBtnSide = document.getElementById('loginBtnSide');
+const logoutBtnSide = document.getElementById('logoutBtnSide');
+
+function setSideNav(activeId) {
+  document.querySelectorAll('.side-nav .side-nav-item').forEach(el => el.classList.remove('active'));
+  const active = document.getElementById(activeId);
+  if (active) active.classList.add('active');
+  if (historyPanel) historyPanel.hidden = activeId !== 'navHistory';
+  if (settingsPanel) settingsPanel.hidden = activeId !== 'navSettings';
+}
+if (navNewChat) {
+  navNewChat.addEventListener('click', () => {
+    setSideNav('navNewChat');
+    const clearBtn = document.getElementById('clearBtn');
+    if (clearBtn) clearBtn.click();
+  });
+}
+if (navHistory) {
+  navHistory.addEventListener('click', () => {
+    setSideNav('navHistory');
+    if (typeof loadConversations === 'function') loadConversations();
+  });
+}
+if (navSettings) {
+  navSettings.addEventListener('click', () => setSideNav('navSettings'));
+}
+if (themeToggleSide) {
+  const tt = document.getElementById('themeToggle');
+  if (tt) themeToggleSide.addEventListener('click', () => tt.click());
+}
+if (loginBtnSide) {
+  const lb = document.getElementById('loginBtn');
+  if (lb) loginBtnSide.addEventListener('click', () => lb.click());
+}
+if (logoutBtnSide) {
+  const lob = document.getElementById('logoutBtn');
+  if (lob) logoutBtnSide.addEventListener('click', () => lob.click());
+}
+
+
+bindPromptButtons();
+(async()=>{await loadHistory(); await refreshConversationList(); await refreshMemories(); await refreshPdfs();})();
+</script>
+</body>
+</html>
